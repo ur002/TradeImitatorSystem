@@ -10,6 +10,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Runtime.Serialization;
+using Client.Classes;
 
 namespace cServer
 {
@@ -33,6 +34,8 @@ namespace cServer
             ServerSocket.Start();
             _GlobalOrderBook.Init();
             _TradeHIstory.Init();
+            Logger.InitLogger();           
+            Logger.Log.Info("Server started");
             ///Thread tchkdelc = new Thread(() => CheckClientAlive());
             //tchkdelc.Start();
             while (true)
@@ -42,6 +45,7 @@ namespace cServer
                 lock (_lock) DClients.Add(UsGuid, client);
                 _newclientDetected = true;
                 Console.WriteLine($"New client {client.Client.RemoteEndPoint} connected!!");
+                Logger.Log.Info($"New client {client.Client.RemoteEndPoint} connected!!");
                 Thread t = new Thread(() => HandleClients(UsGuid));
                 t.Start();              
                 ClientsCount++;
@@ -71,10 +75,7 @@ namespace cServer
                         }
                         catch (Exception ex)
                         {
-
-                            Console.ForegroundColor = ConsoleColor.Red;
-                            Console.WriteLine($"Exception was acquired@CheckClientAlive2: {ex.Message }.");
-                            Console.ForegroundColor = ConsoleColor.White;
+                            ErrorCatcher(ex, "CheckClientAlive2");
                         }
 
                     }
@@ -82,9 +83,7 @@ namespace cServer
                 catch (Exception ex)
                 {
 
-                    Console.ForegroundColor = ConsoleColor.Red;
-                    Console.WriteLine($"Exception was acquired@CheckClientAlive1: {ex.Message }.");
-                    Console.ForegroundColor = ConsoleColor.White;
+                    ErrorCatcher(ex, "CheckClientAlive1"); 
                 }
 
                 Thread.Sleep(50);
@@ -125,9 +124,7 @@ namespace cServer
             }
             catch(Exception ex)
             {
-                Console.ForegroundColor = ConsoleColor.Red ;
-                Console.WriteLine($"Exception was acquired@HandleClients  {ex.Message }.");
-                Console.ForegroundColor = ConsoleColor.White;
+                ErrorCatcher(ex, "HandleClients");
             }
         }
 
@@ -137,30 +134,40 @@ namespace cServer
         /// </summary>
         static void readCommand(TcpClient client,string clientid,byte[] sCommand, int byte_count)
         {
-            string ReadData = Encoding.ASCII.GetString(sCommand, 0, byte_count);
-            Console.WriteLine(client.Client.RemoteEndPoint + ":" + ReadData);
+            string exception4send = "";
+                string ReadData = Encoding.ASCII.GetString(sCommand, 0, byte_count);
+                Console.WriteLine(client.Client.RemoteEndPoint + ":" + ReadData);
 
-            switch (ReadData.Split(';').First())
-            {
-                case "/UPDATELASTGUIDORDERS":
-                    string guid4update = ReadData.Split(';')[1].ToString();
-                    _GlobalOrderBook.UpdateLastGuid(guid4update, clientid);
-                    break;
-                case "/GETORDERBOOK":
-                    SendOrderBooktoClients(_GlobalOrderBook, client);
-                    break;
-                case "/ADDNEWORDER":                  
-                    string OrderStr = ReadData.Split(';')[1].ToString() ;
-                    var O = TOrder.Deserialize(OrderStr);
-                    _GlobalOrderBook.AddNewOrder(O);
-                    bool TradeDone = CheckOrderForTrade(O);
-                    SendOrderBooktoClients(_GlobalOrderBook);
-                    if (TradeDone )
+                switch (ReadData.Split(';').First())
+                {
+                    case "/UPDATELASTGUIDORDERS":
+                        string guid4update = ReadData.Split(';')[1].ToString();
+                        _GlobalOrderBook.UpdateLastGuid(guid4update, clientid);
+                        break;
+                    case "/GETORDERBOOK":
+                        SendOrderBooktoClients(_GlobalOrderBook, client);
                         SendTradeHistorytoClients(_TradeHIstory);
-                    break;
-                case "/REMOVEORDER":
-                    SendOrderBooktoClients(_GlobalOrderBook);
-                    break;
+                        break;
+                    case "/ADDNEWORDER":
+                        string OrderStr = ReadData.Split(';')[1].ToString();
+                        if (OrderStr.Length > 0)
+                        {
+                            var O = TOrder.Deserialize(OrderStr);
+                            bool TradeDone = CheckOrderForTrade(O);
+                            if (!TradeDone)
+                                _GlobalOrderBook.AddNewOrder(O);
+                            else
+                                SendTradeHistorytoClients(_TradeHIstory);
+                            SendOrderBooktoClients(_GlobalOrderBook);
+                        }
+                            break;
+                    case "/REMOVEORDER":
+                        SendOrderBooktoClients(_GlobalOrderBook);
+                        break;
+                }
+           if (exception4send.Length>0)
+            {
+                Sendbuf2Client(client, Encoding.ASCII.GetBytes("/ERROR;" + exception4send)); 
             }
         }
 
@@ -178,9 +185,7 @@ namespace cServer
             }
             catch(Exception ex)
             {
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine($"Exception was acquired@Sendbuf2Client. {ex.Message }.{ex.StackTrace}");
-                Console.ForegroundColor = ConsoleColor.White;
+                ErrorCatcher(ex, "Sendbuf2Client");
             }
 
         }
@@ -212,9 +217,7 @@ namespace cServer
                 }
                 catch (Exception ex)
                 {
-                    Console.ForegroundColor = ConsoleColor.Red;
-                    Console.WriteLine($"Exception was acquired@SendOrderBooktoClients. {ex.Message }.{ex.StackTrace}");
-                    Console.ForegroundColor = ConsoleColor.White;
+                    ErrorCatcher(ex, "SendOrderBooktoClients");
                 }
             }
         }
@@ -246,9 +249,7 @@ namespace cServer
                 }
                 catch (Exception ex)
                 {
-                    Console.ForegroundColor = ConsoleColor.Red;
-                    Console.WriteLine($"Exception was acquired@SendOrderBooktoClients. {ex.Message }.{ex.StackTrace}");
-                    Console.ForegroundColor = ConsoleColor.White;
+                    ErrorCatcher(ex, "SendTradeHistorytoClients");
                 }
             }
         }
@@ -275,14 +276,13 @@ namespace cServer
         /// <param name="O">Check Order for trade.</param>
         public static bool CheckOrderForTrade(TOrder O)
         {
-            //    if(O.Side == TOrderSide.Sell)
+          
             bool res = false;
+            try
             {
                 List<TOrder> Orders4Del = new List<TOrder>();
                 int qty = O.Quantity;
                 int i = 0;
-                // GetOrders(UserID,Qty) from TradeBook with price<=O.Price and torderside.Ask orderby by addid
-
                 var BookOnlySell = _GlobalOrderBook.Orders.Where(w => ( w.Side != O.Side  && w.UserID != O.UserID && w.Symbol == O.Symbol && (O.Side == TOrderSide.Sell? w.Price >= O.Price: w.Price <= O.Price)));
                 if (BookOnlySell.Any())
                 {
@@ -319,23 +319,42 @@ namespace cServer
                                 res = true;
                                 break;
                             }
-
-
-
-
-                            //     {
-                            //    Tradebook.Order.CLose(); // Delete from TradeOrderBook/Mark inactive move Order to tradehistory
-                            //       }
+                            
                         }
                     }
 
-                        foreach(var OD in Orders4Del)
-                            _GlobalOrderBook.Orders.Remove(OD);
+                foreach(var OD in Orders4Del)
+                    _GlobalOrderBook.Orders.Remove(OD);
                 }
 
             }
+            catch(Exception ex)
+            {
+                ErrorCatcher(ex, "CheckOrderForTrade");
+            }
             return res;
 
+        }
+
+        /// <summary>
+        /// Catch an error
+        /// </summary>
+        /// <param name="ex"></param>
+        private static void ErrorCatcher(Exception ex, string eventname="")
+        {
+            DateTime dt = DateTime.Now;
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine("[" + dt.ToString("yyyy-MM-dd") + "]");
+            Console.WriteLine("* System: Error has occurred: " + (eventname.Length>0?"@"+ eventname+" ":"")+ ex.HResult + " " + ex.Message + Environment.NewLine + "* System: " + ex.StackTrace);
+            Console.ForegroundColor = ConsoleColor.Green;
+
+             Logger.Log.Error("* System: Error has occurred: " + ex.HResult + " " + ex.Message + Environment.NewLine +
+                    "* System: Stack Trace: " + ex.StackTrace + Environment.NewLine +
+                    "* System: Inner Exception: " + ex.InnerException + Environment.NewLine +
+                    "* System: Source: " + ex.Source + Environment.NewLine +
+                   "* System: Target Site: " + ex.TargetSite + Environment.NewLine +
+                   "* System: Help Link: " + ex.HelpLink);
+            
         }
 
 

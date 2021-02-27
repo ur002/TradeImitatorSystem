@@ -73,14 +73,14 @@
             this.cPrice = new System.Windows.Forms.DataGridViewTextBoxColumn();
             this.cMyASKQty = new System.Windows.Forms.DataGridViewTextBoxColumn();
             this.cMKTAskQty = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this.grOrderBook = new System.Windows.Forms.GroupBox();
+            this.grMyActiveORders = new System.Windows.Forms.GroupBox();
+            this.grtradehis = new System.Windows.Forms.GroupBox();
             this.cBuyUserID = new System.Windows.Forms.DataGridViewTextBoxColumn();
             this.cSellUserID = new System.Windows.Forms.DataGridViewTextBoxColumn();
             this.ctSymbol = new System.Windows.Forms.DataGridViewTextBoxColumn();
             this.ctQuantity = new System.Windows.Forms.DataGridViewTextBoxColumn();
             this.ctPrice = new System.Windows.Forms.DataGridViewTextBoxColumn();
-            this.grOrderBook = new System.Windows.Forms.GroupBox();
-            this.grMyActiveORders = new System.Windows.Forms.GroupBox();
-            this.grtradehis = new System.Windows.Forms.GroupBox();
             this.pnTop.SuspendLayout();
             this.pnOrder.SuspendLayout();
             this.pnconnection.SuspendLayout();
@@ -520,49 +520,6 @@
             this.cMKTAskQty.Name = "cMKTAskQty";
             this.cMKTAskQty.Width = 80;
             // 
-            // cBuyUserID
-            // 
-            this.cBuyUserID.DataPropertyName = "BuyUserID";
-            this.cBuyUserID.FillWeight = 160F;
-            this.cBuyUserID.HeaderText = "Buyer";
-            this.cBuyUserID.Name = "cBuyUserID";
-            this.cBuyUserID.Width = 160;
-            // 
-            // cSellUserID
-            // 
-            this.cSellUserID.DataPropertyName = "SellUserID";
-            this.cSellUserID.FillWeight = 160F;
-            this.cSellUserID.HeaderText = "Seller";
-            this.cSellUserID.Name = "cSellUserID";
-            this.cSellUserID.Width = 160;
-            // 
-            // ctSymbol
-            // 
-            dataGridViewCellStyle10.Alignment = System.Windows.Forms.DataGridViewContentAlignment.MiddleCenter;
-            this.ctSymbol.DefaultCellStyle = dataGridViewCellStyle10;
-            this.ctSymbol.HeaderText = "Symbol";
-            this.ctSymbol.Name = "ctSymbol";
-            // 
-            // ctQuantity
-            // 
-            this.ctQuantity.DataPropertyName = "TradedQuantity";
-            dataGridViewCellStyle11.Alignment = System.Windows.Forms.DataGridViewContentAlignment.MiddleCenter;
-            dataGridViewCellStyle11.Format = "N2";
-            dataGridViewCellStyle11.NullValue = null;
-            this.ctQuantity.DefaultCellStyle = dataGridViewCellStyle11;
-            this.ctQuantity.HeaderText = "Quantity";
-            this.ctQuantity.Name = "ctQuantity";
-            // 
-            // ctPrice
-            // 
-            this.ctPrice.DataPropertyName = "TradedPrice";
-            dataGridViewCellStyle12.Alignment = System.Windows.Forms.DataGridViewContentAlignment.MiddleCenter;
-            dataGridViewCellStyle12.Format = "C2";
-            dataGridViewCellStyle12.NullValue = null;
-            this.ctPrice.DefaultCellStyle = dataGridViewCellStyle12;
-            this.ctPrice.HeaderText = "Price";
-            this.ctPrice.Name = "ctPrice";
-            // 
             // grOrderBook
             // 
             this.grOrderBook.BackColor = System.Drawing.SystemColors.ControlLight;
@@ -599,6 +556,50 @@
             this.grtradehis.TabIndex = 3;
             this.grtradehis.TabStop = false;
             this.grtradehis.Text = "Trade history";
+            // 
+            // cBuyUserID
+            // 
+            this.cBuyUserID.DataPropertyName = "BuyUserID";
+            this.cBuyUserID.FillWeight = 160F;
+            this.cBuyUserID.HeaderText = "Buyer";
+            this.cBuyUserID.Name = "cBuyUserID";
+            this.cBuyUserID.Width = 160;
+            // 
+            // cSellUserID
+            // 
+            this.cSellUserID.DataPropertyName = "SellUserID";
+            this.cSellUserID.FillWeight = 160F;
+            this.cSellUserID.HeaderText = "Seller";
+            this.cSellUserID.Name = "cSellUserID";
+            this.cSellUserID.Width = 160;
+            // 
+            // ctSymbol
+            // 
+            this.ctSymbol.DataPropertyName = "symbol";
+            dataGridViewCellStyle10.Alignment = System.Windows.Forms.DataGridViewContentAlignment.MiddleCenter;
+            this.ctSymbol.DefaultCellStyle = dataGridViewCellStyle10;
+            this.ctSymbol.HeaderText = "Symbol";
+            this.ctSymbol.Name = "ctSymbol";
+            // 
+            // ctQuantity
+            // 
+            this.ctQuantity.DataPropertyName = "TradedQuantity";
+            dataGridViewCellStyle11.Alignment = System.Windows.Forms.DataGridViewContentAlignment.MiddleCenter;
+            dataGridViewCellStyle11.Format = "N2";
+            dataGridViewCellStyle11.NullValue = null;
+            this.ctQuantity.DefaultCellStyle = dataGridViewCellStyle11;
+            this.ctQuantity.HeaderText = "Quantity";
+            this.ctQuantity.Name = "ctQuantity";
+            // 
+            // ctPrice
+            // 
+            this.ctPrice.DataPropertyName = "TradedPrice";
+            dataGridViewCellStyle12.Alignment = System.Windows.Forms.DataGridViewContentAlignment.MiddleCenter;
+            dataGridViewCellStyle12.Format = "C2";
+            dataGridViewCellStyle12.NullValue = null;
+            this.ctPrice.DefaultCellStyle = dataGridViewCellStyle12;
+            this.ctPrice.HeaderText = "Price";
+            this.ctPrice.Name = "ctPrice";
             // 
             // fClient
             // 
@@ -668,14 +669,14 @@
         private System.Windows.Forms.DataGridViewTextBoxColumn cMyASKQty;
         private System.Windows.Forms.DataGridViewTextBoxColumn cMKTAskQty;
         private System.Windows.Forms.DataGridView dgvTradeHistory;
+        private System.Windows.Forms.GroupBox grOrderBook;
+        private System.Windows.Forms.GroupBox grMyActiveORders;
+        private System.Windows.Forms.GroupBox grtradehis;
         private System.Windows.Forms.DataGridViewTextBoxColumn cBuyUserID;
         private System.Windows.Forms.DataGridViewTextBoxColumn cSellUserID;
         private System.Windows.Forms.DataGridViewTextBoxColumn ctSymbol;
         private System.Windows.Forms.DataGridViewTextBoxColumn ctQuantity;
         private System.Windows.Forms.DataGridViewTextBoxColumn ctPrice;
-        private System.Windows.Forms.GroupBox grOrderBook;
-        private System.Windows.Forms.GroupBox grMyActiveORders;
-        private System.Windows.Forms.GroupBox grtradehis;
     }
 }
 

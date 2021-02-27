@@ -340,6 +340,7 @@ namespace Client
                     try
                     {
                         dtOrderbook.Clear();
+                        dtMyActiveOrders.Clear();
                         var subGroup = _GlobalOrderBook.Orders
                                 .GroupBy(x => new { _Symbol = x.Symbol, _Side = x.Side, _UserID = x.UserID, _Price = x.Price });
 
