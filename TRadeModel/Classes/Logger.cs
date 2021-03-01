@@ -1,7 +1,7 @@
 ﻿using log4net;
 using log4net.Config;
 
-namespace Client.Classes
+namespace TTRadeModel.Classes
 {
     public static class Logger
     {
@@ -18,7 +18,4 @@ namespace Client.Classes
             XmlConfigurator.Configure();
         }
     }
-
-
-   
 }

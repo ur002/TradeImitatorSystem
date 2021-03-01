@@ -39,13 +39,13 @@
             System.Windows.Forms.DataGridViewCellStyle dataGridViewCellStyle9 = new System.Windows.Forms.DataGridViewCellStyle();
             System.Windows.Forms.DataGridViewCellStyle dataGridViewCellStyle14 = new System.Windows.Forms.DataGridViewCellStyle();
             System.Windows.Forms.DataGridViewCellStyle dataGridViewCellStyle15 = new System.Windows.Forms.DataGridViewCellStyle();
-            System.Windows.Forms.DataGridViewCellStyle dataGridViewCellStyle16 = new System.Windows.Forms.DataGridViewCellStyle();
-            System.Windows.Forms.DataGridViewCellStyle dataGridViewCellStyle20 = new System.Windows.Forms.DataGridViewCellStyle();
-            System.Windows.Forms.DataGridViewCellStyle dataGridViewCellStyle21 = new System.Windows.Forms.DataGridViewCellStyle();
             System.Windows.Forms.DataGridViewCellStyle dataGridViewCellStyle10 = new System.Windows.Forms.DataGridViewCellStyle();
             System.Windows.Forms.DataGridViewCellStyle dataGridViewCellStyle11 = new System.Windows.Forms.DataGridViewCellStyle();
             System.Windows.Forms.DataGridViewCellStyle dataGridViewCellStyle12 = new System.Windows.Forms.DataGridViewCellStyle();
             System.Windows.Forms.DataGridViewCellStyle dataGridViewCellStyle13 = new System.Windows.Forms.DataGridViewCellStyle();
+            System.Windows.Forms.DataGridViewCellStyle dataGridViewCellStyle16 = new System.Windows.Forms.DataGridViewCellStyle();
+            System.Windows.Forms.DataGridViewCellStyle dataGridViewCellStyle20 = new System.Windows.Forms.DataGridViewCellStyle();
+            System.Windows.Forms.DataGridViewCellStyle dataGridViewCellStyle21 = new System.Windows.Forms.DataGridViewCellStyle();
             System.Windows.Forms.DataGridViewCellStyle dataGridViewCellStyle17 = new System.Windows.Forms.DataGridViewCellStyle();
             System.Windows.Forms.DataGridViewCellStyle dataGridViewCellStyle18 = new System.Windows.Forms.DataGridViewCellStyle();
             System.Windows.Forms.DataGridViewCellStyle dataGridViewCellStyle19 = new System.Windows.Forms.DataGridViewCellStyle();
@@ -78,13 +78,13 @@
             this.cMKTAskQty = new System.Windows.Forms.DataGridViewTextBoxColumn();
             this.grMyActiveORders = new System.Windows.Forms.GroupBox();
             this.dgvMyOrders = new System.Windows.Forms.DataGridView();
-            this.grtradehis = new System.Windows.Forms.GroupBox();
-            this.dgvTradeHistory = new System.Windows.Forms.DataGridView();
             this.cDelOrder = new System.Windows.Forms.DataGridViewButtonColumn();
             this.cSymbol = new System.Windows.Forms.DataGridViewTextBoxColumn();
             this.cSide = new System.Windows.Forms.DataGridViewTextBoxColumn();
             this.cQty = new System.Windows.Forms.DataGridViewTextBoxColumn();
             this.coPrice = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this.grtradehis = new System.Windows.Forms.GroupBox();
+            this.dgvTradeHistory = new System.Windows.Forms.DataGridView();
             this.cBuyUserID = new System.Windows.Forms.DataGridViewTextBoxColumn();
             this.cSellUserID = new System.Windows.Forms.DataGridViewTextBoxColumn();
             this.ctSymbol = new System.Windows.Forms.DataGridViewTextBoxColumn();
@@ -537,6 +537,54 @@
             this.dgvMyOrders.Size = new System.Drawing.Size(524, 252);
             this.dgvMyOrders.TabIndex = 0;
             // 
+            // cDelOrder
+            // 
+            this.cDelOrder.FillWeight = 25F;
+            this.cDelOrder.Frozen = true;
+            this.cDelOrder.HeaderText = "";
+            this.cDelOrder.Name = "cDelOrder";
+            this.cDelOrder.Width = 25;
+            // 
+            // cSymbol
+            // 
+            this.cSymbol.DataPropertyName = "symbol";
+            dataGridViewCellStyle10.Alignment = System.Windows.Forms.DataGridViewContentAlignment.MiddleCenter;
+            this.cSymbol.DefaultCellStyle = dataGridViewCellStyle10;
+            this.cSymbol.FillWeight = 80F;
+            this.cSymbol.HeaderText = "Symbol";
+            this.cSymbol.Name = "cSymbol";
+            this.cSymbol.Width = 80;
+            // 
+            // cSide
+            // 
+            this.cSide.DataPropertyName = "side";
+            dataGridViewCellStyle11.Alignment = System.Windows.Forms.DataGridViewContentAlignment.MiddleCenter;
+            this.cSide.DefaultCellStyle = dataGridViewCellStyle11;
+            this.cSide.HeaderText = "OrderSide";
+            this.cSide.Name = "cSide";
+            // 
+            // cQty
+            // 
+            this.cQty.DataPropertyName = "quantity";
+            dataGridViewCellStyle12.Alignment = System.Windows.Forms.DataGridViewContentAlignment.MiddleCenter;
+            dataGridViewCellStyle12.Format = "N2";
+            dataGridViewCellStyle12.NullValue = null;
+            this.cQty.DefaultCellStyle = dataGridViewCellStyle12;
+            this.cQty.FillWeight = 60F;
+            this.cQty.HeaderText = "Quantity";
+            this.cQty.Name = "cQty";
+            this.cQty.Width = 60;
+            // 
+            // coPrice
+            // 
+            this.coPrice.DataPropertyName = "price";
+            dataGridViewCellStyle13.Alignment = System.Windows.Forms.DataGridViewContentAlignment.MiddleCenter;
+            dataGridViewCellStyle13.Format = "N2";
+            dataGridViewCellStyle13.NullValue = null;
+            this.coPrice.DefaultCellStyle = dataGridViewCellStyle13;
+            this.coPrice.HeaderText = "Price";
+            this.coPrice.Name = "coPrice";
+            // 
             // grtradehis
             // 
             this.grtradehis.BackColor = System.Drawing.SystemColors.ControlLight;
@@ -591,54 +639,6 @@
             this.dgvTradeHistory.RowHeadersVisible = false;
             this.dgvTradeHistory.Size = new System.Drawing.Size(977, 308);
             this.dgvTradeHistory.TabIndex = 2;
-            // 
-            // cDelOrder
-            // 
-            this.cDelOrder.FillWeight = 25F;
-            this.cDelOrder.Frozen = true;
-            this.cDelOrder.HeaderText = "";
-            this.cDelOrder.Name = "cDelOrder";
-            this.cDelOrder.Width = 25;
-            // 
-            // cSymbol
-            // 
-            this.cSymbol.DataPropertyName = "symbol";
-            dataGridViewCellStyle10.Alignment = System.Windows.Forms.DataGridViewContentAlignment.MiddleCenter;
-            this.cSymbol.DefaultCellStyle = dataGridViewCellStyle10;
-            this.cSymbol.FillWeight = 80F;
-            this.cSymbol.HeaderText = "Symbol";
-            this.cSymbol.Name = "cSymbol";
-            this.cSymbol.Width = 80;
-            // 
-            // cSide
-            // 
-            this.cSide.DataPropertyName = "side";
-            dataGridViewCellStyle11.Alignment = System.Windows.Forms.DataGridViewContentAlignment.MiddleCenter;
-            this.cSide.DefaultCellStyle = dataGridViewCellStyle11;
-            this.cSide.HeaderText = "OrderSide";
-            this.cSide.Name = "cSide";
-            // 
-            // cQty
-            // 
-            this.cQty.DataPropertyName = "quantity";
-            dataGridViewCellStyle12.Alignment = System.Windows.Forms.DataGridViewContentAlignment.MiddleCenter;
-            dataGridViewCellStyle12.Format = "N2";
-            dataGridViewCellStyle12.NullValue = null;
-            this.cQty.DefaultCellStyle = dataGridViewCellStyle12;
-            this.cQty.FillWeight = 60F;
-            this.cQty.HeaderText = "Quantity";
-            this.cQty.Name = "cQty";
-            this.cQty.Width = 60;
-            // 
-            // coPrice
-            // 
-            this.coPrice.DataPropertyName = "price";
-            dataGridViewCellStyle13.Alignment = System.Windows.Forms.DataGridViewContentAlignment.MiddleCenter;
-            dataGridViewCellStyle13.Format = "N2";
-            dataGridViewCellStyle13.NullValue = null;
-            this.coPrice.DefaultCellStyle = dataGridViewCellStyle13;
-            this.coPrice.HeaderText = "Price";
-            this.coPrice.Name = "coPrice";
             // 
             // cBuyUserID
             // 

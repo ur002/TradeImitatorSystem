@@ -1,4 +1,4 @@
-﻿using Client.DataModel;
+﻿using TTRadeModel.DataModel;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
@@ -33,6 +33,8 @@ namespace Client
         static TTradeHistory _TradeHistory = new TTradeHistory();
         static CancellationTokenSource _ctsUpdateToken;
         static CancellationTokenSource _ctsWorkToken;
+
+
         public fClient()
         {
             InitializeComponent();
@@ -92,6 +94,8 @@ namespace Client
                 _CapStr = $"Connected to {ip}:{port}";
                 _ActiveConnection = true;
                 _ns = _tcpclient.GetStream();
+                if(_LastUserID.Length>0)  TMainModel.SetLastUserID(_LastUserID);
+
                 var ReadTask = Task.Run(() => ReceiveData(_tcpclient, _ctsUpdateToken.Token), _ctsUpdateToken.Token);
                 var UPdateDataTask = Task.Run(() => UPDateData(_ctsUpdateToken.Token), _ctsUpdateToken.Token);
                
@@ -104,7 +108,6 @@ namespace Client
                     _CapStr = "Network Error: Can not connect to target machine";
                     _ActiveConnection = false;
                 }
-
             }
             catch (Exception ex)
             {
@@ -119,16 +122,24 @@ namespace Client
         private bool isConnected(TcpClient c)
         {
             bool res = true;
+            try
+            {
+               
                 if (c.Client.Poll(0, SelectMode.SelectRead))
                 {
                     byte[] buff = new byte[1];
                     if (c.Client.Receive(buff, SocketFlags.Peek) == 0)
                     {
-                    // Client disconnected
-                    res = false;
+                        // Client disconnected
+                        res = false;
                     }
 
                 }
+            }catch(Exception ex)
+            {
+                return false;
+            }
+
 
             return res;
         }
@@ -143,6 +154,7 @@ namespace Client
                 client.Dispose();
                 _CapStr = "disconnect from server!!";
                 _ActiveConnection = false;
+                Thread.Sleep(100);
             }
 
         }
@@ -153,7 +165,7 @@ namespace Client
             try
             {
                 NetworkStream nsw = client.GetStream();
-                byte[] receivedBytes = new byte[4096];
+                byte[] receivedBytes = new byte[2048];
                 int byte_count;
              
                 DateTime lastNWActivity = DateTime.Now;
@@ -163,32 +175,41 @@ namespace Client
                     {
                         if ((byte_count = nsw.Read(receivedBytes, 0, receivedBytes.Length)) > 0)
                         {                        
-                            readCommand(client, receivedBytes, byte_count);
+                            TMainModel.readCommand(client,_UserID, receivedBytes, byte_count);
                         }
+                        
                     }
                     
                 }
-
                 nsw.Close();
+
+
             }
             catch (SocketException sex)
             {
                 if (sex.ErrorCode == 10061)
                 {
-                    MessageBox.Show($"Can not connect to target machine, conenction was  refused", "Network connection problem", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
-                    _CapStr = "Network Error: Can not connect to target machine";                
+                    //MessageBox.Show($"Can not connect to target machine, conenction was  refused", "Network connection problem", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
+                    _CapStr = "Network Error: Can not connect to target machine";
+
+                    _ActiveConnection = false;
                     _tcpclient.Dispose();
                     _ActiveConnection = false;
+                    _GlobalOrderBook.Clear();
+                    _TradeHistory.Clear();
                 }
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"{ex.Message }", "Network connection problem", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
+                //MessageBox.Show($"{ex.Message }", "Network connection problem", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
                 if (!client.Connected)
                 {
                     _CapStr = $"No connection";
                     _ActiveConnection = false;                    
                     _tcpclient.Dispose();
+                    _GlobalOrderBook.Clear();
+                    _TradeHistory.Clear();
+
 
                 }
             }
@@ -196,33 +217,6 @@ namespace Client
         }
 
 
-        /// <summary>
-        /// Read Command from Client
-        /// </summary>
-        async void readCommand(TcpClient client, byte[] sCommand, int byte_count)
-        {
-            string ReadData = Encoding.ASCII.GetString(sCommand, 0, byte_count);
-            switch (ReadData.Split(';').First())
-            {
-                case "/CLIENTNUMBER":
-                    _UserID = ReadData.Split(';')[1]?.ToString();
-                    if (_LastUserID.Length > 0) sendmsg2srv(client, "/UPDATELASTGUIDORDERS;" + _LastUserID);
-                    File.WriteAllText("_lastguid", _UserID);
-                    sendmsg2srv(client, "/GETORDERBOOK;");
-                    break;
-                case "/ORDERBOOK":
-                    string jsdataOB = ReadData.Split(';')[1]?.ToString();
-                    _GlobalOrderBook = JsonConvert.DeserializeObject<TOrderBook>(jsdataOB);
-                    _DoUpdateOB = true;
-                    // txtlog.Text += datasend.ToString() + Environment.NewLine;
-                    break;
-                case "/TRADEHISTORYBOOK":
-                    string jsdataTH = ReadData.Split(';')[1]?.ToString();
-                    _TradeHistory = JsonConvert.DeserializeObject<TTradeHistory>(jsdataTH);
-                    _DouUPdateTH = true;
-                    break;
-            }
-        }
 
         private void fClient_FormClosing(object sender, FormClosingEventArgs e)
         {
@@ -240,23 +234,6 @@ namespace Client
             return tcpstate != null ? tcpstate.State : TcpState.Unknown;
         }
 
-        void sendmsg2srv(TcpClient c, string msg)
-        {
-            try
-            {             
-                NetworkStream nsw = c.GetStream();
-                if (GetState(c) == TcpState.Established)
-                {
-                    byte[] buffer = Encoding.ASCII.GetBytes(msg);
-                    NetworkStream stream = c.GetStream();
-                    stream.Write(buffer, 0, buffer.Length);
-                }
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"{ex.Message }", "Network connection problem", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
-            }
-        }
 
         private void BMakeOrder_Click(object sender, EventArgs e)
         {
@@ -271,7 +248,7 @@ namespace Client
             NewOrder.Price = Convert.ToDouble(txtOrderPrice.Text.Replace('.', ','));
             var dataString = JsonConvert.SerializeObject(NewOrder);
 
-            sendmsg2srv(_tcpclient, @"/ADDNEWORDER;" + dataString);
+            TMainModel.Sendbuf2Client(_tcpclient, Encoding.ASCII.GetBytes(@"/ADDNEWORDER;" + dataString));
 
             txtQuantity.Text = "0";
             txtOrderPrice.Text = "0.0";
@@ -279,8 +256,21 @@ namespace Client
 
         private void fClient_Load(object sender, EventArgs e)
         {
-            _GlobalOrderBook.Init();
+          
             if (File.Exists("_lastguid")) _LastUserID = File.ReadAllText("_lastguid");
+
+            TMainModel.OBInit();
+            TMainModel.TRHInit();
+
+           
+            TMainModel.SetOrderBook(_GlobalOrderBook);
+            TMainModel.SetOrderTradeHistory(_TradeHistory);
+
+            _GlobalOrderBook = TMainModel.GetOrderBook();
+            _TradeHistory = TMainModel.GetTradeHistory();
+
+
+
 
             dgvOB.AutoGenerateColumns = false;
             dgvTradeHistory.AutoGenerateColumns = false;           
@@ -295,8 +285,21 @@ namespace Client
             {
                 try
                 {
+
+                   
                   
-                    if (_DoUpdateOB)
+                        Invoke((MethodInvoker)delegate
+                        {
+                            if (_UserID.Length == 0) _UserID = TMainModel.GetCurrentUserID();
+                            this.Text = _ActiveConnection ? $"{_CapStr}({_UserID}) ob.CNT:{_GlobalOrderBook?.Orders?.Count}" : "noConnection";
+
+                        });
+                    
+                  
+                    _GlobalOrderBook = TMainModel.GetOrderBook();
+                    _TradeHistory = TMainModel.GetTradeHistory();
+                    //if (_DoUpdateOB)
+                    if (_GlobalOrderBook.Orders != null)
                     {
                         try
                         {
@@ -351,8 +354,9 @@ namespace Client
                         }
                     }
 
-                    if (_DouUPdateTH)
+                    if (_TradeHistory.TradesList != null)
                     {
+                        
                         try
                         {
                             if (InvokeRequired)
@@ -372,8 +376,7 @@ namespace Client
                         catch (Exception ex)
                         {
                             MessageBox.Show($"UPDateData.dtTradeHistory.{ex.Message }", "Network connection problem", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
-                        }
-                        _DouUPdateTH = false;
+                        }                       
                     }                 
 
 

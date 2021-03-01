@@ -4,9 +4,9 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace ClientMVP.DataModel
+namespace TTRadeModel
 {
-    class View
+    public class Class1
     {
     }
 }
