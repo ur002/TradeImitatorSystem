@@ -28,14 +28,33 @@ namespace Client.DataModel
 
     }
 
+    public class TTick
+    {
+
+        [JsonProperty]
+        public readonly double Price;
+        [JsonProperty]
+        public readonly int Quantity;
+
+        public TTick(double price, int quantity)
+        {
+            Price = price;
+            Quantity = quantity;
+        }
+
+    }
+
     public class TOrderBook
     {
         [JsonProperty]
         public LinkedList<TOrder> Orders { get; set; }
         private LinkedListNode<TOrder> LastInsertedOrder { get; set; }
+
+        public List<TTick> TickList { get; set; }
         public void Init()
         {
             Orders = new LinkedList<TOrder>();
+            TickList = new List<TTick>();
         }
 
         public void Clear()
@@ -47,6 +66,7 @@ namespace Client.DataModel
         {
             if (Orders != null)
             {
+                TickList.Add(new TTick(O.Price, O.Quantity));
                 if (LastInsertedOrder == null)
                     LastInsertedOrder = Orders.AddFirst(O);
                 else
@@ -65,6 +85,7 @@ namespace Client.DataModel
 
         }
 
+
         // List of orders at each tick 
 
     }
@@ -78,9 +99,9 @@ namespace Client.DataModel
         [JsonProperty]
         public string Symbol { get; set; }
         [JsonProperty]
-        public int TradedQuantity { get; set; }
+        public int Quantity { get; set; }
         [JsonProperty]
-        public double TradedPrice { get; set; }
+        public double Price { get; set; }
 
     }
 
@@ -88,6 +109,10 @@ namespace Client.DataModel
     {
         [JsonProperty]
         public List<TTrade> TradesList { get; set; }
+        public void Init()
+        {
+            TradesList = new List<TTrade>();
+        }
     }
 
 

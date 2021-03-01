@@ -22,7 +22,8 @@ namespace cServer
         static TOrderBook _GlobalOrderBook = new TOrderBook();
         static TTradeHistory _TradeHIstory = new TTradeHistory();
         static bool _newclientDetected = false;
-        static bool _programclosing = false;
+        static CancellationTokenSource _ctsUpdateToken;
+        static CancellationTokenSource _ctsWorkToken;
 
         /// <summary>
         /// MainProgram 
@@ -36,8 +37,10 @@ namespace cServer
             _TradeHIstory.Init();
             Logger.InitLogger();           
             Logger.Log.Info("Server started");
-            ///Thread tchkdelc = new Thread(() => CheckClientAlive());
-            //tchkdelc.Start();
+            _ctsUpdateToken = new CancellationTokenSource();
+            _ctsWorkToken = new CancellationTokenSource();
+
+
             while (true)
             {
                 TcpClient client = ServerSocket.AcceptTcpClient();
@@ -46,17 +49,56 @@ namespace cServer
                 _newclientDetected = true;
                 Console.WriteLine($"New client {client.Client.RemoteEndPoint} connected!!");
                 Logger.Log.Info($"New client {client.Client.RemoteEndPoint} connected!!");
-                Thread t = new Thread(() => HandleClients(UsGuid));
-                t.Start();              
+                var CheckClient = Task.Run(() => IsConnected(client), _ctsUpdateToken.Token);
+                var HandleClient = Task.Run(() => HandleClients(UsGuid), _ctsWorkToken.Token);                
                 ClientsCount++;
             }
-            _programclosing = true;
 
         }
 
-        static void CheckClientAlive()
+        /// <summary>
+        /// Checks the connection state
+        /// </summary>
+        /// <returns>True on connected. False on disconnected.</returns>
+        static bool IsConnected(TcpClient c)
         {
-            while (_programclosing)
+            Socket nSocket = c.Client;
+            try
+            {
+                if (nSocket.Connected)
+                {
+                    if ((nSocket.Poll(0, SelectMode.SelectWrite)) && (!nSocket.Poll(0, SelectMode.SelectError)))
+                    {
+                        byte[] buffer = new byte[1];
+                        if (nSocket.Receive(buffer, SocketFlags.Peek) == 0)
+                        {
+                            return false;
+                        }
+                        else
+                        {
+                            return true;
+                        }
+                    }
+                    else
+                    {
+                        return false;
+                    }
+                }
+                else
+                {
+                    return false;
+                }
+            }
+            catch (Exception ex)
+            {
+                ErrorCatcher(ex, "IsConnected");
+                return false;
+            }
+        }
+
+        public static void CheckClientAlive()
+        {
+            while (true)
             {
                 try
                 {
@@ -64,13 +106,20 @@ namespace cServer
                     {
                         try
                         {
-                            if (c.Client.Connected == false)
+                            if (IsConnected(c) == false)
                             {
                                 var cluid = DClients.FirstOrDefault(x => x.Value == c).Key;
-                                lock (_lock) DClients.Remove(cluid);
-                                Console.WriteLine($"Client {c.Client.RemoteEndPoint} was disconnected!!");
-                                c.Client.Shutdown(SocketShutdown.Both);
-                                c.Close();
+                                {
+                                    if (cluid != null)
+                                    {
+                                        lock (_lock) DClients.Remove(cluid);
+                                        Console.WriteLine($"Client {c.Client.RemoteEndPoint} was disconnected!!");
+                                        c.Client.Shutdown(SocketShutdown.Both);
+                                        c.Close();
+                                    }
+                                    else
+                                        break;
+                                }
                             }
                         }
                         catch (Exception ex)
@@ -90,10 +139,12 @@ namespace cServer
             }
 
         }
+
         /// <summary>
         /// Handle with clients
         /// </summary>
-        private  static void HandleClients(string cluid)
+        /// <param name="cluid">ClientUID</param>
+        public static void HandleClients(string cluid)
         {
             try
             {
@@ -106,7 +157,6 @@ namespace cServer
                     byte[] buffer = Encoding.ASCII.GetBytes($"/CLIENTNUMBER;{clientid}");
                     Sendbuf2Client (Client , buffer);                  
                 }
-
                 while (true)
                 {
                     NetworkStream stream = Client.GetStream();
@@ -116,9 +166,9 @@ namespace cServer
                     
                     readCommand(Client, clientid, buffer, byte_count);                   
                 }
-
-                lock (_lock) DClients.Remove(clientid);
                 Console.WriteLine($"Client {Client.Client.RemoteEndPoint} was disconnected!!");
+                Logger.Log.Info($"Client {Client.Client.RemoteEndPoint} was disconnected!!");
+                lock (_lock) DClients.Remove(clientid);              
                 Client.Client.Shutdown(SocketShutdown.Both);
                 Client.Close();
             }
@@ -128,21 +178,24 @@ namespace cServer
             }
         }
 
-
         /// <summary>
         /// Read Command from Client
         /// </summary>
-        static void readCommand(TcpClient client,string clientid,byte[] sCommand, int byte_count)
+        /// <param name="client">TCPCLIENT</param>
+        /// <param name="clientid">ClientID.</param>
+        /// <param name="sCommand">received command text.</param>
+        /// <param name="byte_count">received length of sCommand.</param>
+        public static void readCommand(TcpClient client,string clientid,byte[] sCommand, int byte_count)
         {
             string exception4send = "";
                 string ReadData = Encoding.ASCII.GetString(sCommand, 0, byte_count);
                 Console.WriteLine(client.Client.RemoteEndPoint + ":" + ReadData);
-
                 switch (ReadData.Split(';').First())
                 {
                     case "/UPDATELASTGUIDORDERS":
                         string guid4update = ReadData.Split(';')[1].ToString();
                         _GlobalOrderBook.UpdateLastGuid(guid4update, clientid);
+                        _TradeHIstory.UpdateLastGuid(guid4update, clientid);
                         break;
                     case "/GETORDERBOOK":
                         SendOrderBooktoClients(_GlobalOrderBook, client);
@@ -176,12 +229,15 @@ namespace cServer
         /// </summary>
         /// <param name="c">TCPCLIENT for send.</param>
         /// <param name="buffer">byte[] buffer for send.</param>
-        static void Sendbuf2Client(TcpClient c,byte[] buffer)
+        public static void Sendbuf2Client(TcpClient c,byte[] buffer)
         {
             try
             {
-                NetworkStream stream = c.GetStream();
-                stream.Write(buffer, 0, buffer.Length);
+                if (IsConnected(c))
+                {
+                    NetworkStream stream = c.GetStream();
+                    stream.Write(buffer, 0, buffer.Length);
+                }
             }
             catch(Exception ex)
             {
@@ -194,7 +250,7 @@ namespace cServer
         /// Send Order Book to clients
         /// </summary>
         /// <param name="OrderBook">OrderBook for send.</param>
-        private static void SendOrderBooktoClients(TOrderBook OrderBook, TcpClient client = null)
+        public static void SendOrderBooktoClients(TOrderBook OrderBook, TcpClient client = null)
         {
             if (OrderBook != null && OrderBook.Orders.Count > 0)
             {
@@ -226,7 +282,7 @@ namespace cServer
         /// Send TrdeHistory Book to clients
         /// </summary>
         /// <param name="TradeBook">TradeHistoryBook for send.</param>
-        private static void SendTradeHistorytoClients(TTradeHistory TradeBook, TcpClient client = null)
+        public static void SendTradeHistorytoClients(TTradeHistory TradeBook, TcpClient client = null)
         {
             if (TradeBook != null && TradeBook.TradesList.Count > 0)
             {
@@ -275,20 +331,19 @@ namespace cServer
         /// </summary>
         /// <param name="O">Check Order for trade.</param>
         public static bool CheckOrderForTrade(TOrder O)
-        {
-          
+        {          
             bool res = false;
             try
             {
                 List<TOrder> Orders4Del = new List<TOrder>();
-                int qty = O.Quantity;
-                int i = 0;
-                var BookOnlySell = _GlobalOrderBook.Orders.Where(w => ( w.Side != O.Side  && w.UserID != O.UserID && w.Symbol == O.Symbol && (O.Side == TOrderSide.Sell? w.Price >= O.Price: w.Price <= O.Price)));
-                if (BookOnlySell.Any())
+                int qty = O.Quantity;             
+                var OBook = _GlobalOrderBook.Orders.Where(w => ( w.Side != O.Side  && w.Symbol == O.Symbol && (O.Side == TOrderSide.Sell? w.Price >= O.Price: w.Price <= O.Price)));
+                if (OBook.Any())
                 {
-                    foreach (var OiB in BookOnlySell)
+                    foreach (var OiB in OBook)
                     {
-                        while (qty > 0)
+                        bool ONeMoreOrder = false;
+                        while (qty > 0 && !ONeMoreOrder)
                         {
                             if (qty >= OiB.Quantity)
                             {
@@ -296,14 +351,17 @@ namespace cServer
                                 NewTrade.BuyUserID = O.UserID;
                                 NewTrade.SellUserID = OiB.UserID;
                                 NewTrade.Symbol = O.Symbol;
-                                NewTrade.TradedPrice = OiB.Price;
-                                NewTrade.TradedQuantity = OiB.Quantity;
-                                _TradeHIstory.TradesList.Add(NewTrade);
-                                
+                                NewTrade.Price = OiB.Price;
+                                NewTrade.Quantity = OiB.Quantity;
+                                _TradeHIstory.MakeTrade(NewTrade);
+                                Console.ForegroundColor = ConsoleColor.Green;
+                                Console.WriteLine($"{NewTrade.BuyUserID} buy lot from {NewTrade.SellUserID} - {OiB.Quantity}!!");
+                                Console.ForegroundColor = ConsoleColor.White;
+                                Logger.Log.Info($"{NewTrade.BuyUserID} buy lot from {NewTrade.SellUserID} - {OiB.Quantity}!!");
                                 qty -= OiB.Quantity;
                                 Orders4Del.Add(OiB);
                                 res = true;
-                                break;
+                                ONeMoreOrder = true;
                             }
                             else
                             {
@@ -311,20 +369,36 @@ namespace cServer
                                 NewTrade.BuyUserID = O.UserID;
                                 NewTrade.SellUserID = OiB.UserID;
                                 NewTrade.Symbol = O.Symbol;
-                                NewTrade.TradedPrice = OiB.Price;
-                                NewTrade.TradedQuantity = qty;
-                                _TradeHIstory.TradesList.Add(NewTrade);
+                                NewTrade.Price = OiB.Price;
+                                NewTrade.Quantity = qty;
+                                _TradeHIstory.MakeTrade(NewTrade);
+                                Console.ForegroundColor = ConsoleColor.Green;
+                                Console.WriteLine($"{NewTrade.BuyUserID} buy lot from {NewTrade.SellUserID} - {qty} !!");
+                                Logger.Log.Info($"{NewTrade.BuyUserID} buy lot from {NewTrade.SellUserID} - {qty} !!");
+                                Console.ForegroundColor = ConsoleColor.White;
                                 OiB.Quantity -= qty;
                                 qty = 0;
                                 res = true;
-                                break;
                             }
                             
                         }
                     }
 
-                foreach(var OD in Orders4Del)
-                    _GlobalOrderBook.Orders.Remove(OD);
+
+                    if (qty > 0)
+                    {
+                        O.Quantity = qty;
+                        _GlobalOrderBook.AddNewOrder(O);
+                    }
+                    foreach (var OD in Orders4Del)
+                    {
+                        Console.ForegroundColor = ConsoleColor.Cyan;
+                        Console.WriteLine($"Close Order from {OD.UserID}  side/symbol/qty/price  {OD.Side}/{OD.Symbol}/{OD.Quantity}/{O.Price}");
+                        Logger.Log.Info($"Close Order from {OD.UserID}  side/symbol/qty/price  {OD.Side}/{OD.Symbol}/{OD.Quantity}/{O.Price}");
+                        Console.ForegroundColor = ConsoleColor.White;
+                        _GlobalOrderBook.Orders.Remove(OD);
+                    }
+
                 }
 
             }
@@ -340,13 +414,13 @@ namespace cServer
         /// Catch an error
         /// </summary>
         /// <param name="ex"></param>
-        private static void ErrorCatcher(Exception ex, string eventname="")
+        public static void ErrorCatcher(Exception ex, string eventname="")
         {
             DateTime dt = DateTime.Now;
             Console.ForegroundColor = ConsoleColor.Red;
             Console.WriteLine("[" + dt.ToString("yyyy-MM-dd") + "]");
             Console.WriteLine("* System: Error has occurred: " + (eventname.Length>0?"@"+ eventname+" ":"")+ ex.HResult + " " + ex.Message + Environment.NewLine + "* System: " + ex.StackTrace);
-            Console.ForegroundColor = ConsoleColor.Green;
+            Console.ForegroundColor = ConsoleColor.White;
 
              Logger.Log.Error("* System: Error has occurred: " + ex.HResult + " " + ex.Message + Environment.NewLine +
                     "* System: Stack Trace: " + ex.StackTrace + Environment.NewLine +

@@ -22,21 +22,17 @@ namespace Client
 
         static string _CapStr = "";
         static bool _ActiveConnection = false;
-        static TcpClient _tcpclient = new TcpClient();     
-        static bool _THCanReadData = true;
+        static TcpClient _tcpclient;
         static string _UserID = string.Empty;
         static bool _DoUpdateOB = false;
         static string _LastUserID = string.Empty;
-        static NetworkStream _ns;
-        static Thread _ReadThread;
-        static DataTable dtOrderbook = new DataTable("OrderBook");
-        static DataTable dtTradeHistory = new DataTable("TradeHistory");
-        static DataTable dtMyActiveOrders = new DataTable("dtMyActiveOrders"); 
-        static bool _doUpdateData = true;
+        static NetworkStream _ns;             
         static bool _DouUPdateTH = false;
-
+        static string _CurrSymb = "";
         static TOrderBook _GlobalOrderBook = new TOrderBook();
         static TTradeHistory _TradeHistory = new TTradeHistory();
+        static CancellationTokenSource _ctsUpdateToken;
+        static CancellationTokenSource _ctsWorkToken;
         public fClient()
         {
             InitializeComponent();
@@ -44,7 +40,7 @@ namespace Client
 
         private void cmbBIDASK_SelectedIndexChanged(object sender, EventArgs e)
         {
-            pnTop.BackColor = cmbBIDASK.SelectedIndex ==1 ? Color.LightGreen : Color.MistyRose;
+            pnTop.BackColor = cmbBIDASK.SelectedIndex == 1 ? Color.LightGreen : Color.MistyRose;
         }
 
         private void bReconnect_Click(object sender, EventArgs e)
@@ -59,35 +55,46 @@ namespace Client
 
         private void bConnect_Click(object sender, EventArgs e)
         {
-            MakeConn(txtHost.Text, Convert.ToInt32(txtPort.Text));
-            Text = _CapStr;
+            if (!_ActiveConnection) 
+            {
+                _ctsUpdateToken = new CancellationTokenSource();
+                _ctsWorkToken = new CancellationTokenSource();
+                MakeConn(txtHost.Text, Convert.ToInt32(txtPort.Text)); 
+            }
+            else
+            {
+                _ctsUpdateToken.Cancel();
+                _ctsWorkToken.Cancel();
+                Disconnect(_tcpclient);
+                dgvMyOrders.DataSource = null;
+                dgvOB.DataSource = null;
+                dgvTradeHistory.DataSource = null;
+            }
+
             pnconnection.Visible = !_ActiveConnection;
             pnOrder.Visible = _ActiveConnection;
-
+            txtHost.Enabled = !_ActiveConnection;
+            txtPort.Enabled = !_ActiveConnection;
+            bConnect.Text = !_ActiveConnection ? "Connect" : "Disconnect";
+            Text = _CapStr;
 
         }
 
-        void MakeConn(string sip, int port)
+
+        private void MakeConn(string sip, int port)
         {
             IPAddress ip = IPAddress.Parse(sip);
-            
             try
             {
-                if (_tcpclient == null || _tcpclient.Client ==null)
-                    _tcpclient = new TcpClient();
-                
-                if (!_tcpclient.Connected  )
-                {
-                    _tcpclient.Connect(ip, port);
-                    
-                    {
-                        _CapStr = $"Connected to {ip}:{port}";
-                        _ActiveConnection = true;
-                         _ns = _tcpclient.GetStream();
-                         _ReadThread = new Thread(() => ReceiveData(_tcpclient));
-                        _ReadThread.Start();
-                    }
-                }
+                _tcpclient = new TcpClient();
+                _tcpclient.Connect(ip, port);
+               
+                _CapStr = $"Connected to {ip}:{port}";
+                _ActiveConnection = true;
+                _ns = _tcpclient.GetStream();
+                var ReadTask = Task.Run(() => ReceiveData(_tcpclient, _ctsUpdateToken.Token), _ctsUpdateToken.Token);
+                var UPdateDataTask = Task.Run(() => UPDateData(_ctsUpdateToken.Token), _ctsUpdateToken.Token);
+               
             }
             catch (SocketException sex)
             {
@@ -95,64 +102,71 @@ namespace Client
                 {
                     MessageBox.Show($"Cannt connect to target machine, conenction was  refused", "Network connection problem", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
                     _CapStr = "Network Error: Can not connect to target machine";
-                    _THCanReadData = false;
-                    _tcpclient.Close();
+                    _ActiveConnection = false;
                 }
 
             }
             catch (Exception ex)
             {
                 MessageBox.Show($"{ex.Message }", "Network connection problem", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
-                _THCanReadData = false;
-                _tcpclient.Close();
+                _ActiveConnection = false;
             }
-            
 
         }
 
 
 
-        static void Disconnect(TcpClient client)
+        private bool isConnected(TcpClient c)
         {
-            if (client.Client.Connected)
+            bool res = true;
+                if (c.Client.Poll(0, SelectMode.SelectRead))
+                {
+                    byte[] buff = new byte[1];
+                    if (c.Client.Receive(buff, SocketFlags.Peek) == 0)
+                    {
+                    // Client disconnected
+                    res = false;
+                    }
+
+                }
+
+            return res;
+        }
+        private void Disconnect(TcpClient client)
+        {
+            if (client == null) return;
+            if (isConnected(client))
             {
                 client.Client.Shutdown(SocketShutdown.Send);
-                //_ReadThread.Join();
                 _ns.Close();
                 client.Close();
+                client.Dispose();
                 _CapStr = "disconnect from server!!";
+                _ActiveConnection = false;
             }
 
         }
 
-        void ReceiveData(TcpClient client)
+        async void  ReceiveData(TcpClient client, CancellationToken cancellationToken)
         {
-            string res = "";
+           
             try
             {
-
                 NetworkStream nsw = client.GetStream();
-                byte[] receivedBytes = new byte[1024];
+                byte[] receivedBytes = new byte[4096];
                 int byte_count;
-                bool timeout = false;
+             
                 DateTime lastNWActivity = DateTime.Now;
-                while ((client.Connected && !timeout) || _THCanReadData)
+                while (client.Connected && !cancellationToken.IsCancellationRequested)
                 {
-                    //if (client.Client.Poll(1, SelectMode.SelectRead) && !nsw.DataAvailable)
                     if (GetState(client) == TcpState.Established)
                     {
                         if ((byte_count = nsw.Read(receivedBytes, 0, receivedBytes.Length)) > 0)
-                        {
-                            //res = Encoding.ASCII.GetString(receivedBytes, 0, byte_count);
+                        {                        
                             readCommand(client, receivedBytes, byte_count);
-                            //UpdatetxtLog(res);
                         }
                     }
-                    else
-                    {
-                        if (DateTime.Now > lastNWActivity.AddSeconds(60))
-                            timeout = true;
-                    }
+                    
                 }
 
                 nsw.Close();
@@ -162,9 +176,9 @@ namespace Client
                 if (sex.ErrorCode == 10061)
                 {
                     MessageBox.Show($"Can not connect to target machine, conenction was  refused", "Network connection problem", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
-                    _CapStr = "Network Error: Can not connect to target machine";
-                    _THCanReadData = false;
+                    _CapStr = "Network Error: Can not connect to target machine";                
                     _tcpclient.Dispose();
+                    _ActiveConnection = false;
                 }
             }
             catch (Exception ex)
@@ -173,59 +187,49 @@ namespace Client
                 if (!client.Connected)
                 {
                     _CapStr = $"No connection";
-                    _ActiveConnection = false;
-                    _THCanReadData = false;
+                    _ActiveConnection = false;                    
                     _tcpclient.Dispose();
 
                 }
             }
-           
+
         }
 
 
         /// <summary>
         /// Read Command from Client
         /// </summary>
-         void readCommand(TcpClient client, byte[] sCommand, int byte_count)
+        async void readCommand(TcpClient client, byte[] sCommand, int byte_count)
         {
             string ReadData = Encoding.ASCII.GetString(sCommand, 0, byte_count);
-            Console.WriteLine(client.Client.RemoteEndPoint + ":" + ReadData);
-
             switch (ReadData.Split(';').First())
             {
                 case "/CLIENTNUMBER":
                     _UserID = ReadData.Split(';')[1]?.ToString();
-                    if (_LastUserID.Length>0) sendmsg(_tcpclient, "/UPDATELASTGUIDORDERS;"+_LastUserID);
+                    if (_LastUserID.Length > 0) sendmsg2srv(client, "/UPDATELASTGUIDORDERS;" + _LastUserID);
                     File.WriteAllText("_lastguid", _UserID);
-                    sendmsg(_tcpclient, "/GETORDERBOOK;");
+                    sendmsg2srv(client, "/GETORDERBOOK;");
                     break;
                 case "/ORDERBOOK":
                     string jsdataOB = ReadData.Split(';')[1]?.ToString();
-                   _GlobalOrderBook = JsonConvert.DeserializeObject<TOrderBook>(jsdataOB);
+                    _GlobalOrderBook = JsonConvert.DeserializeObject<TOrderBook>(jsdataOB);
                     _DoUpdateOB = true;
-                   // txtlog.Text += datasend.ToString() + Environment.NewLine;
+                    // txtlog.Text += datasend.ToString() + Environment.NewLine;
                     break;
                 case "/TRADEHISTORYBOOK":
                     string jsdataTH = ReadData.Split(';')[1]?.ToString();
                     _TradeHistory = JsonConvert.DeserializeObject<TTradeHistory>(jsdataTH);
                     _DouUPdateTH = true;
                     break;
-                     
             }
         }
 
-        void repaintORderBook()
-        {
-
-
-        }
-
-     
-
         private void fClient_FormClosing(object sender, FormClosingEventArgs e)
         {
+            if (_ctsUpdateToken != null) _ctsUpdateToken.Cancel();
+            if (_ctsWorkToken != null)  _ctsWorkToken.Cancel();
             Disconnect(_tcpclient);
-            _doUpdateData = false;
+
         }
 
         public static TcpState GetState(TcpClient tcpClient)
@@ -236,26 +240,17 @@ namespace Client
             return tcpstate != null ? tcpstate.State : TcpState.Unknown;
         }
 
-        void sendmsg(TcpClient c, string msg)
+        void sendmsg2srv(TcpClient c, string msg)
         {
             try
-            {
-                if (c == null) c = new TcpClient();
-                if (!c.Client.Connected)
+            {             
+                NetworkStream nsw = c.GetStream();
+                if (GetState(c) == TcpState.Established)
                 {
-                    MakeConn(txtHost.Text, Convert.ToInt32(txtPort.Text));
-                    Text = _CapStr;
-                    pnconnection.Visible = !_ActiveConnection;
+                    byte[] buffer = Encoding.ASCII.GetBytes(msg);
+                    NetworkStream stream = c.GetStream();
+                    stream.Write(buffer, 0, buffer.Length);
                 }
-                    NetworkStream nsw = c.GetStream();
-                    if (GetState(c) == TcpState.Established)
-                    {
-                        byte[] buffer = Encoding.ASCII.GetBytes(msg);
-                        NetworkStream stream = c.GetStream();
-                        stream.Write(buffer, 0, buffer.Length);
-                    }
-                
-               
             }
             catch (Exception ex)
             {
@@ -265,7 +260,7 @@ namespace Client
 
         private void BMakeOrder_Click(object sender, EventArgs e)
         {
-            if (Convert.ToInt32(txtQuantity.Text) == 0 ) { MessageBox.Show("Quantity must be qreater than 0");return; }
+            if (Convert.ToInt32(txtQuantity.Text) == 0) { MessageBox.Show("Quantity must be qreater than 0"); return; }
             if (Convert.ToDouble(txtOrderPrice.Text.Replace('.', ',')) == 0) { MessageBox.Show("Price must be qreater than 0"); return; }
 
             TOrder NewOrder = new TOrder();
@@ -274,151 +269,128 @@ namespace Client
             NewOrder.Symbol = cmbTradeSmbols.Text;
             NewOrder.Quantity = Convert.ToInt32(txtQuantity.Text);
             NewOrder.Price = Convert.ToDouble(txtOrderPrice.Text.Replace('.', ','));
-    
+            var dataString = JsonConvert.SerializeObject(NewOrder);
 
-            var dataString = JsonConvert.SerializeObject(NewOrder);            
-            
-            sendmsg(_tcpclient, @"/ADDNEWORDER;"+dataString);
+            sendmsg2srv(_tcpclient, @"/ADDNEWORDER;" + dataString);
+
             txtQuantity.Text = "0";
             txtOrderPrice.Text = "0.0";
         }
 
         private void fClient_Load(object sender, EventArgs e)
-        {           
+        {
             _GlobalOrderBook.Init();
             if (File.Exists("_lastguid")) _LastUserID = File.ReadAllText("_lastguid");
-            Thread THUpdater = new Thread(() => UPDateData());
-            THUpdater.Start();
-
-            #region CreateDataColumns
-            dtOrderbook.Columns.Add("SYMBOL", typeof(string));
-            dtOrderbook.Columns.Add("MYBIDQTY", typeof(int));
-            dtOrderbook.Columns.Add("MYASKQTY", typeof(int));
-            dtOrderbook.Columns.Add("MKTBIDQTY", typeof(int));
-            dtOrderbook.Columns.Add("MKTASKQTY", typeof(int));
-            dtOrderbook.Columns.Add("PRICE", typeof(double));
-
-            dtTradeHistory.Columns.Add("BuyUserID", typeof(string));
-            dtTradeHistory.Columns.Add("SellUserID", typeof(string));
-            dtTradeHistory.Columns.Add("Symbol", typeof(string));
-            dtTradeHistory.Columns.Add("TradedPrice", typeof(double));
-            dtTradeHistory.Columns.Add("TradedQuantity", typeof(int));
-
-            dtMyActiveOrders.Columns.Add("SYMBOL", typeof(string));
-            dtMyActiveOrders.Columns.Add("SIDE", typeof(string));
-            dtMyActiveOrders.Columns.Add("QTY", typeof(int));
-            dtMyActiveOrders.Columns.Add("PRICE", typeof(double));
-            #endregion
 
             dgvOB.AutoGenerateColumns = false;
-            dgvTradeHistory.AutoGenerateColumns = false;
-            dgvOB.DataSource = dtOrderbook;
-            dgvTradeHistory.DataSource = dtTradeHistory;
+            dgvTradeHistory.AutoGenerateColumns = false;           
             dgvMyOrders.AutoGenerateColumns = false;
-            dgvMyOrders.DataSource = dtMyActiveOrders;
+
         }
 
-        private void UPDateData()
+        private async void UPDateData(CancellationToken cancellationToken)
         {
-            while (_doUpdateData)
+
+            while (!cancellationToken.IsCancellationRequested)
             {
-
-                if (InvokeRequired)
+                try
                 {
-                    Invoke((MethodInvoker)delegate
+                  
+                    if (_DoUpdateOB)
                     {
-                       if( this.Text != _CapStr) this.Text = _CapStr;
-                    });
-                }
-                else
-                {
-                    if (this.Text != _CapStr) this.Text = _CapStr;
-                }
-               
-                if (_DoUpdateOB)
-                {
-                    try
-                    {
-                        dtOrderbook.Clear();
-                        dtMyActiveOrders.Clear();
-                        var subGroup = _GlobalOrderBook.Orders
-                                .GroupBy(x => new { _Symbol = x.Symbol, _Side = x.Side, _UserID = x.UserID, _Price = x.Price });
-
-
-                        foreach (TOrder O in _GlobalOrderBook.Orders)
+                        try
                         {
-
+                         var qmyorders = _GlobalOrderBook.Orders                           
+                            .Where(w => (w.Symbol == _CurrSymb && w.UserID==_UserID))                            
+                            .Select(cl => new
                             {
-                                int MYBIDQTY = O.Side == TOrderSide.Buy & O.UserID == _UserID ? O.Quantity : 0;
-                                int MYASKQTY = O.Side == TOrderSide.Sell & O.UserID == _UserID ? O.Quantity : 0;
-                                int MKTBIDQTY = O.Side == TOrderSide.Buy & O.UserID != _UserID ? O.Quantity : 0;
-                                int MKTASKQTY = O.Side == TOrderSide.Sell & O.UserID != _UserID ? O.Quantity : 0;
+                                cl.Symbol,
+                                cl.Side,
+                                cl.Quantity,
+                                cl.Price
+                            }).ToList();
 
-                                dtOrderbook.Rows.Add(new object[] { O.Symbol, MYBIDQTY, MYASKQTY, MKTBIDQTY, MKTASKQTY, O.Price });
-                            }
-                            if(O.UserID == _UserID)
+                            var grOB = _GlobalOrderBook.Orders
+                            .OrderBy(o => o.Price)
+                            .Where(w => w.Symbol == _CurrSymb)
+                            .GroupBy(l => new { l.Side,  l.Price })
+                            .Select(cl => new
                             {
-                                dtMyActiveOrders.Rows.Add(new object[] { O.Symbol, O.Side, O.Quantity, O.Price });
+                                Symbol = cl.First().Symbol,                                
+                                MYBIDQTY = cl.First().Side == TOrderSide.Buy & cl.First().UserID == _UserID ? cl.Sum(s => s.Quantity) : 0,
+                                MYASKQTY = cl.First().Side == TOrderSide.Sell & cl.First().UserID == _UserID ? cl.Sum(s => s.Quantity) : 0,
+                                MKTBIDQTY = cl.First().Side == TOrderSide.Buy & cl.First().UserID != _UserID ? cl.Sum(s => s.Quantity) : 0,
+                                MKTASKQTY = cl.First().Side == TOrderSide.Sell & cl.First().UserID != _UserID ? cl.Sum(s => s.Quantity) : 0,
+                            Price = cl.First().Price
+                            }).ToList();
+
+
+
+                            if (InvokeRequired)
+                            {
+                                Invoke((MethodInvoker)delegate
+                                {
+                                    dgvOB.DataSource = grOB;
+                                    dgvOB.Update();
+                                    dgvMyOrders.DataSource = qmyorders;
+                                    dgvMyOrders.Update();
+                                });
                             }
-                        }
-
-
-
-                        if (InvokeRequired)
-                        {
-                            Invoke((MethodInvoker)delegate
-                            {                                                        
+                            else
+                            {
+                                dgvOB.DataSource = grOB;
                                 dgvOB.Update();
+                                dgvMyOrders.DataSource = qmyorders;
                                 dgvMyOrders.Update();
-                            });
+                            }
+                            _DoUpdateOB = false;
                         }
-                        else
-                        {                                                    
-                            dgvOB.Update();
-                            dgvMyOrders.Update();
+                        catch (Exception ex)
+                        {
+                            MessageBox.Show($"UPDateData.dtMyActiveOrders.{ex.Message }", "Network connection problem", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
                         }
-
-
-                        _DoUpdateOB = false;
                     }
-                    catch(Exception ex)
+
+                    if (_DouUPdateTH)
                     {
-                        MessageBox.Show($"UPDateData.{ex.Message }", "Network connection problem", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
-                    }
-                   
-                }
-
-                if (_DouUPdateTH)
-                {
-                    dtTradeHistory.Clear();
-
-
-                    foreach (TTrade Tr in _TradeHistory.TradesList)
-                    {
-
-                        dtTradeHistory.Rows.Add(new object[] { Tr.BuyUserID, Tr.SellUserID , Tr.Symbol, Tr.TradedQuantity, Tr.TradedPrice });
-                    }
-
-                    if (InvokeRequired)
-                    {
-                        Invoke((MethodInvoker)delegate
-                        {                            
-                            dgvTradeHistory.Update();
-                        });
-                    }
-                    else
-                    {                       
-                        dgvTradeHistory.Update();
-                    }
-
-                    
-
+                        try
+                        {
+                            if (InvokeRequired)
+                            {
+                                Invoke((MethodInvoker)delegate
+                                {
+                                    dgvTradeHistory.DataSource = _TradeHistory.TradesList.ToList();
+                                    dgvTradeHistory.Update();
+                                });
+                            }
+                            else
+                            {
+                                dgvTradeHistory.DataSource = _TradeHistory.TradesList.ToList();
+                                dgvTradeHistory.Update();
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            MessageBox.Show($"UPDateData.dtTradeHistory.{ex.Message }", "Network connection problem", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
+                        }
                         _DouUPdateTH = false;
+                    }                 
+
+
                 }
+                catch (Exception ex)
+                { MessageBox.Show($"UPDateData.{ex.Message }", "UPDateData", MessageBoxButtons.OK, MessageBoxIcon.Exclamation); }
                 Thread.Sleep(100);
             }
-           
         }
+
+        private void cmbTradeSmbols_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            _DoUpdateOB = true;
+            _CurrSymb = cmbTradeSmbols.Text;
+        }
+
+       
     }
 }
 

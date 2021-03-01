@@ -5,7 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Server.DataModel
+namespace Client.DataModel
 {
     public class TOrder
     {
@@ -25,7 +25,7 @@ namespace Server.DataModel
             return Newtonsoft.Json.JsonConvert.DeserializeObject<TOrder>(JSON);
         }
 
-    
+
     }
 
     public class TTick
@@ -51,15 +51,15 @@ namespace Server.DataModel
         private LinkedListNode<TOrder> LastInsertedOrder { get; set; }
 
         public List<TTick> TickList { get; set; }
-        public  void Init()
+        public void Init()
         {
-             Orders = new LinkedList<TOrder>();
-             TickList = new List<TTick>();
+            Orders = new LinkedList<TOrder>();
+            TickList = new List<TTick>();
         }
 
         public void Clear()
         {
-            if (Orders!= null) Init();
+            if (Orders != null) Init();
             Orders.Clear();
         }
         public void AddNewOrder(TOrder O)
@@ -78,14 +78,14 @@ namespace Server.DataModel
         {
             Orders.Remove(O);
         }
-        public void UpdateLastGuid(string oldGuid,string NewGuid)
+        public void UpdateLastGuid(string oldGuid, string NewGuid)
         {
-            foreach(TOrder O in Orders)
-               if (O.UserID == oldGuid) O.UserID = NewGuid;
-            
+            foreach (TOrder O in Orders)
+                if (O.UserID == oldGuid) O.UserID = NewGuid;
+
         }
 
-        
+
         // List of orders at each tick 
 
     }
@@ -99,35 +99,20 @@ namespace Server.DataModel
         [JsonProperty]
         public string Symbol { get; set; }
         [JsonProperty]
-        public int Quantity { get; set; }
+        public int TradedQuantity { get; set; }
         [JsonProperty]
-        public double Price { get; set; }
+        public double TradedPrice { get; set; }
 
     }
 
     public class TTradeHistory
     {
         [JsonProperty]
-       public List<TTrade> TradesList { get; set; }
+        public List<TTrade> TradesList { get; set; }
         public void Init()
         {
             TradesList = new List<TTrade>();
         }
-        public void MakeTrade(TTrade Trd)
-        {
-            TradesList.Add(Trd);
-        }
-
-        public void UpdateLastGuid(string oldGuid, string NewGuid)
-        {
-            foreach (TTrade Tr in TradesList)
-            {
-                if (Tr.BuyUserID == oldGuid) Tr.BuyUserID = NewGuid;
-                if (Tr.SellUserID == oldGuid) Tr.SellUserID = NewGuid;
-            }
-
-        }
-
     }
 
 
