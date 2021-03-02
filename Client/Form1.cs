@@ -33,6 +33,8 @@ namespace Client
         static TTradeHistory _TradeHistory = new TTradeHistory();
         static CancellationTokenSource _ctsUpdateToken;
         static CancellationTokenSource _ctsWorkToken;
+        static int _LastOrderCNTInOB = 0;
+        static int _LastTradeCNTInTRH = 0;
 
 
         public fClient()
@@ -287,8 +289,7 @@ namespace Client
                 {
 
                    
-                  
-                        Invoke((MethodInvoker)delegate
+                       Invoke((MethodInvoker)delegate
                         {
                             if (_UserID.Length == 0) _UserID = TMainModel.GetCurrentUserID();
                             this.Text = _ActiveConnection ? $"{_CapStr}({_UserID}) ob.CNT:{_GlobalOrderBook?.Orders?.Count}" : "noConnection";
@@ -298,9 +299,10 @@ namespace Client
                   
                     _GlobalOrderBook = TMainModel.GetOrderBook();
                     _TradeHistory = TMainModel.GetTradeHistory();
-                    //if (_DoUpdateOB)
-                    if (_GlobalOrderBook.Orders != null)
+
+                    if ( _LastOrderCNTInOB !=_GlobalOrderBook.Orders?.Count() && _GlobalOrderBook.Orders != null)
                     {
+                    
                         try
                         {
                          var qmyorders = _GlobalOrderBook.Orders                           
@@ -346,7 +348,8 @@ namespace Client
                                 dgvMyOrders.DataSource = qmyorders;
                                 dgvMyOrders.Update();
                             }
-                            _DoUpdateOB = false;
+
+                            _LastOrderCNTInOB = _GlobalOrderBook.Orders.Count();
                         }
                         catch (Exception ex)
                         {
@@ -354,7 +357,7 @@ namespace Client
                         }
                     }
 
-                    if (_TradeHistory.TradesList != null)
+                    if (_LastTradeCNTInTRH!= _TradeHistory.TradesList?.Count() && _TradeHistory.TradesList != null)
                     {
                         
                         try
@@ -372,6 +375,7 @@ namespace Client
                                 dgvTradeHistory.DataSource = _TradeHistory.TradesList.ToList();
                                 dgvTradeHistory.Update();
                             }
+                            _LastTradeCNTInTRH = _TradeHistory.TradesList.Count();
                         }
                         catch (Exception ex)
                         {

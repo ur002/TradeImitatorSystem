@@ -121,7 +121,7 @@ namespace TTRadeModel.DataModel
                 case "/ADDNEWORDER":
                     string OrderStr = ReadData.Split(';')[1].ToString();
                     if (OrderStr.Length > 0)
-                    {
+                    {                       
                         var O = TOrder.Deserialize(OrderStr);
                         bool TradeDone = CheckOrderForTrade(O);
                         if (!TradeDone)
@@ -143,14 +143,11 @@ namespace TTRadeModel.DataModel
                     break;
                 case "/ORDERBOOK":
                     string jsdataOB = ReadData.Split(';')[1]?.ToString();
-                    _OB = JsonConvert.DeserializeObject<TOrderBook>(jsdataOB);
-                    //_DoUpdateOB = true;
-                    // txtlog.Text += datasend.ToString() + Environment.NewLine;
+                    _OB = JsonConvert.DeserializeObject<TOrderBook>(jsdataOB);                 
                     break;
                 case "/TRADEHISTORYBOOK":
                     string jsdataTH = ReadData.Split(';')[1]?.ToString();
-                    _TRH = JsonConvert.DeserializeObject<TTradeHistory>(jsdataTH);
-                    //_DouUPdateTH = true;
+                    _TRH = JsonConvert.DeserializeObject<TTradeHistory>(jsdataTH);               
                     break;
             }
             if (exception4send.Length > 0)
@@ -168,7 +165,7 @@ namespace TTRadeModel.DataModel
         {
             try
             {
-                //if (IsConnected(c))
+                if (GetState(c) == TcpState.Established)
                 {
                     NetworkStream stream = c.GetStream();
                     stream.Write(buffer, 0, buffer.Length);
@@ -211,6 +208,7 @@ namespace TTRadeModel.DataModel
                     ErrorCatcher(ex, "SendOrderBooktoClients");
                 }
             }
+
         }
 
         /// <summary>

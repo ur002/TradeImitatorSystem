@@ -9,6 +9,7 @@ namespace TTRadeModel.DataModel
 {
     public class TOrderBook
     {
+        private bool _changed = false;
 
         [JsonProperty]
         public LinkedList<TOrder> Orders { get; set; }
@@ -16,7 +17,15 @@ namespace TTRadeModel.DataModel
         [JsonProperty]
         public List<TTick> TickList { get; set; }
 
-        
+        public bool GetTOBChangeState()
+        {
+            return _changed;
+        }
+        public void SetTOBChangeState(bool changed)
+        {
+            _changed = changed;
+        }
+
         public void Init()
         {            
             Orders = new LinkedList<TOrder>();
@@ -37,11 +46,13 @@ namespace TTRadeModel.DataModel
                     LastInsertedOrder = Orders.AddFirst(O);
                 else
                     LastInsertedOrder = Orders.AddAfter(LastInsertedOrder, O);
+                SetTOBChangeState(true);
             }
         }
         public void RemoveOrder(TOrder O)
         {
             Orders.Remove(O);
+            SetTOBChangeState(true);
         }
         public void UpdateLastGuid(string oldGuid, string NewGuid)
         {
