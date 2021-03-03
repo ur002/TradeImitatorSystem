@@ -6,5 +6,5 @@ Implement a full-stack live trading system in C#
 − Server Side Price/Time Priority Matching Engine
 − Client Side Trading Desktop User Interface
 
-![Client](https://dudec.ru/nc/index.php/apps/files_sharing/publicpreview/8xQkws6yyGA4KDq?x=1880&y=556&a=true&file=client.jpg&scalingup=0)
-![Server](https://dudec.ru/nc/index.php/apps/files_sharing/publicpreview/mL93i5seQsw5c68?x=1880&y=561&a=true&file=server.jpg&scalingup=0)
+![Client](https://dudec.ru/nc/index.php/s/YsnFtbqcQtjSckz)
+![Server](https://dudec.ru/nc/index.php/s/Q8emcaAJ63n4SkH)
