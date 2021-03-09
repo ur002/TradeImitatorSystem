@@ -7,4 +7,4 @@ Implement a full-stack live trading system in C#
 − Client Side Trading Desktop User Interface
 
 ![Client](https://dudec.ru/nc/index.php/s/YsnFtbqcQtjSckz/preview)
-![Server](https://dudec.ru/nc/index.php/core/preview?fileId=129900&x=1920&y=1080&a=true)
+![Server](https://dudec.ru/nc/index.php/s/Q8emcaAJ63n4SkH/preview)
